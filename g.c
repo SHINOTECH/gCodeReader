@@ -4,10 +4,12 @@
 #include <math.h>
 #include <float.h>
 
+//Check for bad gCode files!
 //Function error checking
 //Allow G02 and other commands
 //Imposible path checking
 //Make sure all varaible types are best for the situation
+//Change from double to float?
 
 struct vector {
         double  x,
@@ -138,37 +140,29 @@ int getRampInfo (struct rampInfo *ramp, struct vector *start, struct vector *end
         return 0;
 }
 
-//Put each component into a subroutine
-int main (int argc, char **argv)
+void loadFile (char *fileName, struct gCodeInfo **gCode, int *lineNum)
 {
-        //Clean up the variables
-        FILE *gCodeFile;
+	unsigned int i;
+        FILE *file;
         char row[255];
-        unsigned int lineNum;
-        struct gCodeInfo *gCode;
-        unsigned int i;
-        struct arcInfo *arc;
-        struct lineInfo *line;
-        struct rampInfo ramp[2];
 
-        gCodeFile = fopen ("in.g", "r");
+        file = fopen (fileName, "r");
 
-        for (lineNum = 1; fgets (row, 255, gCodeFile); lineNum++);
+        for (*lineNum = 1; fgets (row, 255, file); ++*lineNum);
 
-        gCode = malloc (lineNum * sizeof(*gCode));
-        gCode[0].p = (struct vector){0.0, 0.0, 0.0};
-        gCode[0].f = 0.0;
+        *gCode = malloc (*lineNum * sizeof(struct gCodeInfo));
+        *gCode[0] = (struct gCodeInfo){(struct vector){0.0, 0.0, 0.0}, 0.0};
 
-        fseek (gCodeFile, 0, SEEK_SET);
+        fseek (file, 0, SEEK_SET);
 
-        for (i = 1; fgets (row, 255, gCodeFile); i++) {
+        for (i = 1; fgets (row, 255, file); i++) {
                 static struct gCodeInfo rowCode;
                 char *split;
 
 		split = strtok (row, " ");
 
                 if (strcmp (split, "G01")) {
-                        printf ("Unsupported G-code command on row %d\n", lineNum);
+                        printf ("Unsupported G-code command on row %d\n", *lineNum);
                         break;
                 }
 
@@ -191,10 +185,34 @@ int main (int argc, char **argv)
                         split = strtok (NULL, " ");
                 }
 
-                gCode[i] = rowCode;
+                *(*gCode + i) = rowCode;
 
                 free (split);
         }
+
+        fclose (file);
+}
+
+//Put each component into a subroutine
+int main (int argc, char **argv)
+{
+        //Clean up the variables
+        unsigned int lineNum;
+        struct gCodeInfo *gCode;
+        unsigned int i;
+        struct arcInfo *arc;
+        struct lineInfo *line;
+        struct rampInfo ramp[2];
+
+	if (argc < 2) {
+		printf ("You need to pass in a G-code file\n");
+		return 1;
+	} else if (argc > 2) {
+		printf ("Too many arguments\n");
+		return 1;
+	}
+
+	loadFile (argv[1], &gCode, &lineNum);
 
         arc = malloc ((lineNum - 2) * sizeof(*arc));
         line = malloc ((lineNum - 1) * sizeof(*line));
@@ -283,60 +301,11 @@ int main (int argc, char **argv)
 		normalize (&line[i].dir);
         }
 
-        double time;
-        double totalTime = 0.0;
-        struct vector point;
-
-        //Ramp up to first arc
-        //Need better structure for this
-        //Make more effieient
-        for (time = 0; time < ramp[0].time; time += 0.001) {
-                struct vector pos;
-                //This has two vectors with the direction, only one is nessecary
-                pos = multVec (&ramp[0].dir, ((magnitude (&ramp[0].accel) / 2.0) * pow (time, 2.0)) + (gCode[1].f * time));
-                point = addVec (&gCode[0].p, &pos);
-                printf ("%f, %f, %f\n", point.x, point.y, point.z);
-        }
-        totalTime += ramp[0].time;
-
-        //Make sure there is no repeated point between lines and arcs
-        //Make more efficient
-        //Cleanup
-        for (i = 0; ; i++) {
-                for (time = 0; time < line[i].time; time += 0.001) {
-                        struct vector pos;
-                        pos = multVec (&line[i].dir, gCode[i + 1].f * time);
-                        point = addVec (&line[i].start, &pos);
-                        printf ("%f, %f, %f\n", point.x, point.y, point.z);
-                }
-                totalTime += line[i].time;
-
-                if (i == lineNum - 2)
-                        break;
-
-                for (time = 0; time < arc[i].time; time += 0.001) {
-                        point = getArcPos (&arc[i], ((((gCode[i + 2].f - gCode[i + 1].f) * pow (time, 2.0)) / (2.0 * arc[i].time)) + (gCode[i + 1].f * time)) / arc[i].radius);
-                        printf ("%f, %f, %f\n", point.x, point.y, point.z);
-                }
-                totalTime += arc[i].time;
-        }
-
-        //Ramp down from last arc
-        //Need better structure for this
-        //Make more effieient
-        for (time = 0; time < ramp[1].time; time += 0.001) {
-                struct vector pos;
-                //This has two vectors with the direction, only one is nessecary
-                pos = multVec (&ramp[1].dir, ((magnitude (&ramp[1].accel) / 2.0) * pow (time, 2.0)) + (gCode[lineNum - 1].f * time));
-                point = addVec (&line[2].end, &pos);
-                printf ("%f, %f, %f\n", point.x, point.y, point.z);
-        }
 
         //Free as soon a possible
         free (gCode);
         free (arc);
         free (line);
-        fclose (gCodeFile);
 
         return 0;
 }
