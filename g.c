@@ -140,23 +140,36 @@ int getRampInfo (struct rampInfo *ramp, struct vector *start, struct vector *end
         return 0;
 }
 
-void loadFile (char *fileName, struct gCodeInfo **gCode, int *lineNum)
+/* Reads the G-code file into an array */
+void readFile (char *fileName, struct gCodeInfo **gCode, int *lineNum)
 {
 	unsigned int i;
-        FILE *file;
         char row[255];
+        FILE *file;
 
-        file = fopen (fileName, "r");
+        if (!(file = fopen (fileName, "r"))) {
+		perror ("Failed to open file");
+		exit (1);
+	}
 
-        for (*lineNum = 1; fgets (row, 255, file); ++*lineNum);
+        for (*lineNum = 1; fgets (row, 255, file); (*lineNum)++);
 
-        *gCode = malloc (*lineNum * sizeof(struct gCodeInfo));
+	if (*lineNum < 3) {
+		fprintf (stderr, "The G-code file needs to have more than one command\n");
+		exit (1);
+	}
+
+        if (!(*gCode = malloc (*lineNum * sizeof(struct gCodeInfo)))) {
+		fprintf (stderr, "Failed to allocate memory\n");
+		exit (1);
+	}
         *gCode[0] = (struct gCodeInfo){(struct vector){0.0, 0.0, 0.0}, 0.0};
 
         fseek (file, 0, SEEK_SET);
 
         for (i = 1; fgets (row, 255, file); i++) {
-                static struct gCodeInfo rowCode;
+		static struct vector rowCode;
+		double rowFeed = 0.0;
                 char *split;
 
 		split = strtok (row, " ");
@@ -169,23 +182,28 @@ void loadFile (char *fileName, struct gCodeInfo **gCode, int *lineNum)
                 while (split) {
                         switch (split[0]) {
                                 case 'X':
-                                        rowCode.p.x = atof (++split);
+                                        rowCode.x = atof (++split);
                                         break;
                                 case 'Y':
-                                        rowCode.p.y = atof (++split);
+                                        rowCode.y = atof (++split);
                                         break;
                                 case 'Z':
-                                        rowCode.p.z = atof (++split);
+                                        rowCode.z = atof (++split);
                                         break;
                                 case 'F':
-                                        rowCode.f = atof (++split);
+					rowFeed = atof (++split);
                                         break;
                         }
-
                         split = strtok (NULL, " ");
                 }
 
-                *(*gCode + i) = rowCode;
+		if (rowFeed == 0.0) {
+			fprintf (stderr, "Feed rate on line %d is missing, or zero\n", i);
+			exit (1);
+		}
+
+		i[*gCode].p = rowCode;
+		i[*gCode].f = rowFeed;
 
                 free (split);
         }
@@ -197,22 +215,24 @@ void loadFile (char *fileName, struct gCodeInfo **gCode, int *lineNum)
 int main (int argc, char **argv)
 {
         //Clean up the variables
+        unsigned int i;
         unsigned int lineNum;
         struct gCodeInfo *gCode;
-        unsigned int i;
+
         struct arcInfo *arc;
         struct lineInfo *line;
+
         struct rampInfo ramp[2];
 
 	if (argc < 2) {
-		printf ("You need to pass in a G-code file\n");
+		fprintf (stderr, "You need to pass in a G-code file\n");
 		return 1;
 	} else if (argc > 2) {
-		printf ("Too many arguments\n");
+		fprintf (stderr, "Too many arguments\n");
 		return 1;
 	}
 
-	loadFile (argv[1], &gCode, &lineNum);
+	readFile (argv[1], &gCode, &lineNum);
 
         arc = malloc ((lineNum - 2) * sizeof(*arc));
         line = malloc ((lineNum - 1) * sizeof(*line));
