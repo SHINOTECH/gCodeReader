@@ -1,3 +1,3 @@
 all:
 	gcc conv.c -lm -o conv
-	gcc plot.c -o plot
+	gcc plot.c -lm -o plot
