@@ -224,6 +224,8 @@ int main (int argc, char **argv)
 
         struct rampInfo ramp[2];
 
+	FILE *file;
+
 	if (argc < 2) {
 		fprintf (stderr, "You need to pass in a G-code file\n");
 		return 1;
@@ -321,6 +323,13 @@ int main (int argc, char **argv)
 		normalize (&line[i].dir);
         }
 
+	//Writing to file
+	file = fopen ("out.bin", "w");
+	fwrite (&lineNum, sizeof(int), 1, file);
+	fwrite (ramp, sizeof(struct rampInfo), 2, file);
+	fwrite (arc, sizeof(struct arcInfo), lineNum - 2, file);
+	fwrite (line, sizeof(struct lineInfo), lineNum - 1, file);
+	fclose (file);
 
         //Free as soon a possible
         free (gCode);
