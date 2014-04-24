@@ -9,7 +9,6 @@
 //Allow G02 and other commands
 //Imposible path checking
 //Make sure all varaible types are best for the situation
-//Change from double to float?
 
 struct vector {
         double  x,
@@ -28,6 +27,7 @@ struct arcInfo {
         		cross;
         double	radius,
         	angle,
+		accel,
         	time;
 };
 
@@ -92,6 +92,7 @@ struct vector crossProduct (struct vector *in1, struct vector *in2)
         };
 }
 
+//Use dot product instead
 double angleProduct (struct vector *in1, struct vector *in2)
 {
         struct vector cross;
@@ -101,6 +102,7 @@ double angleProduct (struct vector *in1, struct vector *in2)
         return asin (magnitude (&cross) / (magnitude (&*in1) * magnitude (&*in2)));
 }
 
+//Make more efficient
 struct vector getArcPos (struct arcInfo *arc, double angle)
 {
         return (struct vector){
@@ -298,6 +300,9 @@ int main (int argc, char **argv)
                 //Finding the time spent traveling on the arc
                 arc[i - 1].time = (arc[i - 1].angle * arc[i - 1].radius) / (((gCode[i + 1].f - gCode[i].f) / 2.0) + gCode[i].f);
 
+		//Calculating the actual acceleration
+		arc[i - 1].accel = (gCode[i + 1].f - gCode[i].f) / arc[i - 1].time;
+
                 //Converting the unit vector to the center to a vector at the center
                 centerMag = arc[i - 1].radius / sin (theta);
                 arc[i - 1].center = multVec (&toCenter, centerMag);
@@ -335,7 +340,6 @@ int main (int argc, char **argv)
         for (i = 0; i < lineNum - 1; i++) {
                 line[i].velocity = subVec (&line[i].end, &line[i].start);
                 line[i].time = magnitude (&line[i].velocity) / gCode[i + 1].f;
-		//printf ("%lf\n", line[i].time);
 		normalize (&line[i].velocity);
 		line[i].velocity = multVec (&line[i].velocity, gCode[i + 1].f);
         }
