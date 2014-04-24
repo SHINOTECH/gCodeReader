@@ -28,8 +28,7 @@ struct lineInfo {
 };
 
 struct rampInfo {
-        struct vector   accel,
-                        dir;
+        struct vector accel;
         double time;
 };
 
@@ -50,10 +49,16 @@ double magnitude (struct vector *input)
 
 struct vector getArcPos (struct arcInfo *arc, double angle)
 {
+        double  cosAngle,
+                sinAngle;
+
+        cosAngle = cos (angle);
+        sinAngle = sin (angle);
+
         return (struct vector){
-                (cos (angle) * arc->toSurf.x) + (sin (angle) * arc->cross.x) + arc->center.x,
-                (cos (angle) * arc->toSurf.y) + (sin (angle) * arc->cross.y) + arc->center.y,
-                (cos (angle) * arc->toSurf.z) + (sin (angle) * arc->cross.z) + arc->center.z
+                (cosAngle * arc->toSurf.x) + (sinAngle * arc->cross.x) + arc->center.x,
+                (cosAngle * arc->toSurf.y) + (sinAngle * arc->cross.y) + arc->center.y,
+                (cosAngle * arc->toSurf.z) + (sinAngle * arc->cross.z) + arc->center.z
         };
 }
 
@@ -96,6 +101,13 @@ int main (int argc, char **argv)
 
 	file = fopen ("plot.csv", "w");
 
+	//Ramp up
+        for (time = 0; time < ramp[0].time; time += timeStep) {
+		point = multVec (&ramp[0].accel, 0.5 * pow (time, 2.0));
+                fprintf (file, "%f, %f, %f\n", point.x, point.y, point.z);
+        }
+        totalTime += ramp[0].time;
+
         for (i = 0; ; i++) {
 		for (time = 0.0; time < line[i].time; time += timeStep) {
 			point = multVec (&line[i].velocity, time);
@@ -110,10 +122,20 @@ int main (int argc, char **argv)
                 for (time = 0.0; time < arc[i].time; time += timeStep) {
                         point = getArcPos (&arc[i], ((0.5 * arc[i].accel * pow (time, 2.0)) + (magnitude (&line[i].velocity) * time)) / arc[i].radius);
                         fprintf (file, "%f, %f, %f\n", point.x, point.y, point.z);
-
                 }
                 totalTime += arc[i].time;
         }
+
+	//Ramp down
+        for (time = 0; time < ramp[1].time; time += timeStep) {
+		struct vector pos;
+		point = multVec (&ramp[1].accel, -0.5 * pow (time, 2.0));
+		pos = multVec (&line[lineNum - 2].velocity, time);
+		point = addVec (&point, &pos);
+		point = addVec (&line[lineNum - 2].end, &point);
+                fprintf (file, "%f, %f, %f\n", point.x, point.y, point.z);
+        }
+        totalTime += ramp[1].time;
 
 	fclose (file);
 
