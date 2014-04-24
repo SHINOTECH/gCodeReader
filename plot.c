@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <math.h>
 
+//Error checking
+
 struct vector {
         double  x,
                 y,
@@ -14,13 +16,14 @@ struct arcInfo {
         		cross;
         double	radius,
 		angle,
+		accel,
 		time;
 };
 
 struct lineInfo {
-        struct vector	start,
-        		end,
-        		dir;
+        struct vector	velocity,
+        		start,
+        		end;
         double time;
 };
 
@@ -30,6 +33,30 @@ struct rampInfo {
         double time;
 };
 
+struct vector addVec (struct vector *in1, struct vector *in2)
+{
+        return (struct vector){in1->x + in2->x, in1->y + in2->y, in1->z + in2->z};
+}
+
+struct vector multVec (struct vector *vec, double scaler)
+{
+        return (struct vector){vec->x * scaler, vec->y * scaler, vec->z * scaler};
+}
+
+double magnitude (struct vector *input)
+{
+        return fabs (sqrt (pow (input->x, 2) + pow (input->y, 2) + pow (input->z, 2)));
+}
+
+struct vector getArcPos (struct arcInfo *arc, double angle)
+{
+        return (struct vector){
+                (cos (angle) * arc->toSurf.x) + (sin (angle) * arc->cross.x) + arc->center.x,
+                (cos (angle) * arc->toSurf.y) + (sin (angle) * arc->cross.y) + arc->center.y,
+                (cos (angle) * arc->toSurf.z) + (sin (angle) * arc->cross.z) + arc->center.z
+        };
+}
+
 int main (int argc, char **argv)
 {
 	FILE *file;
@@ -38,9 +65,12 @@ int main (int argc, char **argv)
 	struct lineInfo *line;
 	struct rampInfo ramp[2];
 
-	double time;
-        double totalTime = 0.0;
+	double time = 0;
+        double totalTime = 0;
+	double timeStep = 0.001;
         struct vector point;
+
+	unsigned int i;
 
 	if (argc < 2) {
 		fprintf (stderr, "You need to give a file name\n");
@@ -54,60 +84,38 @@ int main (int argc, char **argv)
 
 	fread (&lineNum, sizeof(int), 1, file);
 
+	fread (ramp, sizeof(struct rampInfo), 2, file);
+
 	arc = malloc ((lineNum - 2) * sizeof(struct arcInfo));
 	line = malloc ((lineNum - 1) * sizeof(struct lineInfo));
-
-	fread (ramp, sizeof(struct rampInfo), 2, file);
 
 	fread (arc, sizeof(struct arcInfo), lineNum - 2, file);
 	fread (line, sizeof(struct lineInfo), lineNum - 1, file);
 
 	fclose (file);
 
-        //Ramp up to first arc
-        //Need better structure for this
-        //Make more effieient
-        for (time = 0; time < ramp[0].time; time += 0.001) {
-                struct vector pos;
-                //This has two vectors with the direction, only one is nessecary
-                pos = multVec (&ramp[0].dir, ((magnitude (&ramp[0].accel) / 2.0) * pow (time, 2.0)) + (gCode[1].f * time));
-                point = addVec (&gCode[0].p, &pos);
-                printf ("%f, %f, %f\n", point.x, point.y, point.z);
-        }
-        totalTime += ramp[0].time;
+	file = fopen ("plot.csv", "w");
 
-        //Make sure there is no repeated point between lines and arcs
-        //Make more efficient
-        //Cleanup
         for (i = 0; ; i++) {
-                for (time = 0; time < line[i].time; time += 0.001) {
-                        struct vector pos;
-                        pos = multVec (&line[i].dir, gCode[i + 1].f * time);
-                        point = addVec (&line[i].start, &pos);
-                        printf ("%f, %f, %f\n", point.x, point.y, point.z);
-                }
+		for (time = 0.0; time < line[i].time; time += timeStep) {
+			point = multVec (&line[i].velocity, time);
+			point = addVec (&line[i].start, &point);
+			fprintf (file, "%f, %f, %f\n", point.x, point.y, point.z);
+		}
                 totalTime += line[i].time;
 
                 if (i == lineNum - 2)
                         break;
 
-                for (time = 0; time < arc[i].time; time += 0.001) {
-                        point = getArcPos (&arc[i], ((((gCode[i + 2].f - gCode[i + 1].f) * pow (time, 2.0)) / (2.0 * arc[i].time)) + (gCode[i + 1].f * time)) / arc[i].radius);
-                        printf ("%f, %f, %f\n", point.x, point.y, point.z);
+                for (time = 0.0; time < arc[i].time; time += timeStep) {
+                        point = getArcPos (&arc[i], ((0.5 * arc[i].accel * pow (time, 2.0)) + (magnitude (&line[i].velocity) * time)) / arc[i].radius);
+                        fprintf (file, "%f, %f, %f\n", point.x, point.y, point.z);
+
                 }
                 totalTime += arc[i].time;
         }
 
-        //Ramp down from last arc
-        //Need better structure for this
-        //Make more effieient
-        for (time = 0; time < ramp[1].time; time += 0.001) {
-                struct vector pos;
-                //This has two vectors with the direction, only one is nessecary
-                pos = multVec (&ramp[1].dir, ((magnitude (&ramp[1].accel) / 2.0) * pow (time, 2.0)) + (gCode[lineNum - 1].f * time));
-                point = addVec (&line[2].end, &pos);
-                printf ("%f, %f, %f\n", point.x, point.y, point.z);
-        }
+	fclose (file);
 
 	free (arc);
 	free (line);
