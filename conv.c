@@ -40,7 +40,6 @@ struct lineInfo {
         double time;
 };
 
-//Drop dir
 struct rampInfo {
         struct vector accel;
         double time;
@@ -115,7 +114,7 @@ struct vector getArcPos (struct arcInfo arc, double angle)
         };
 }
 
-int calcRampInfo (struct rampInfo *ramp, struct vector *start, struct vector *end, double startVel, double endVel, struct vector *line)
+int calcRampInfo (struct rampInfo *ramp, struct vector start, struct vector end, double startVel, double endVel, struct vector *line)
 {
 	struct vector dir;
 	struct vector distance;
@@ -123,30 +122,23 @@ int calcRampInfo (struct rampInfo *ramp, struct vector *start, struct vector *en
 
         ramp->accel = (struct vector){DBL_MAX, DBL_MAX, DBL_MAX};
 
-        dir = subVec (*end, *start);
+        dir = subVec (end, start);
         normalize (&dir);
 
-	//Getting the minimum allowed acceleration of the axies in motion
-        if (start->x != end->x && fabs (ramp->accel.x) > maxAccel.x)
+        if (start.x != end.x && fabs (ramp->accel.x) > maxAccel.x)
 		accel = maxAccel.x / dir.x;
-        if (start->y != end->y && fabs (ramp->accel.y) > maxAccel.y)
+        if (start.y != end.y && fabs (ramp->accel.y) > maxAccel.y)
 		accel = maxAccel.y / dir.y;
-        if (start->z != end->z && fabs (ramp->accel.z) > maxAccel.z)
+        if (start.z != end.z && fabs (ramp->accel.z) > maxAccel.z)
 		accel = maxAccel.z / dir.z;
 
 	ramp->accel = multVec (dir, accel);
         ramp->time = fabs (endVel - startVel) / accel;
 
-        //Make shorter
-        if (endVel > startVel) {
-                line->x = ((ramp->accel.x / 2.0) * pow (ramp->time, 2.0)) + start->x;
-                line->y = ((ramp->accel.y / 2.0) * pow (ramp->time, 2.0)) + start->y;
-                line->z = ((ramp->accel.z / 2.0) * pow (ramp->time, 2.0)) + start->z;
-        } else {
-                line->x = end->x - ((ramp->accel.x / 2.0) * pow (ramp->time, 2.0));
-                line->y = end->y - ((ramp->accel.y / 2.0) * pow (ramp->time, 2.0));
-                line->z = end->z - ((ramp->accel.z / 2.0) * pow (ramp->time, 2.0));
-        }
+        if (endVel > startVel)
+		*line = addVec (start, multVec (ramp->accel, 0.5 * pow (ramp->time, 2.0)));
+	else
+		*line = addVec (end, multVec (ramp->accel, -0.5 * pow (ramp->time, 2.0)));
 
         return 0;
 }
@@ -349,8 +341,8 @@ int main (int argc, char **argv)
         arc = malloc ((lineNum - 2) * sizeof(*arc));
         line = malloc ((lineNum - 1) * sizeof(*line));
 
-        calcRampInfo (&ramp[0], &gCode[0].p, &gCode[1].p, gCode[0].f, gCode[1].f, &line[0].start);
-        calcRampInfo (&ramp[1], &gCode[lineNum - 2].p, &gCode[lineNum - 1].p, gCode[lineNum - 1].f, 0.0, &line[lineNum - 2].end);
+        calcRampInfo (&ramp[0], gCode[0].p, gCode[1].p, gCode[0].f, gCode[1].f, &line[0].start);
+        calcRampInfo (&ramp[1], gCode[lineNum - 2].p, gCode[lineNum - 1].p, gCode[lineNum - 1].f, 0.0, &line[lineNum - 2].end);
 	calcArcInfo (gCode, arc, line, lineNum);
 	calcLineInfo (gCode, line, lineNum);
 
