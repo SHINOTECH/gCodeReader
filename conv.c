@@ -23,18 +23,18 @@ struct gCodeInfo {
 };
 
 struct arcInfo {
-        struct vector toSurf;
-        struct vector center;
-        struct vector cross;
-        double radius;
-        double angle;
-        double time;
+        struct vector	toSurf,
+        		center,
+        		cross;
+        double	radius,
+        	angle,
+        	time;
 };
 
 struct lineInfo {
-        struct vector start;
-        struct vector end;
-        struct vector dir;
+        struct vector	velocity,
+			start,
+        		end;
         double time;
 };
 
@@ -221,9 +221,9 @@ void writeFile (struct rampInfo *ramp, struct arcInfo *arc, struct lineInfo *lin
 	file = fopen (strcat (name, ".bin"), "w");
 
 	fwrite (lineNum, sizeof(int), 1, file);
-	fwrite (&ramp, sizeof(struct rampInfo), 2, file);
-	fwrite (&arc, sizeof(struct arcInfo), *lineNum - 2, file);
-	fwrite (&line, sizeof(struct lineInfo), *lineNum - 1, file);
+	fwrite (ramp, sizeof(struct rampInfo), 2, file);
+	fwrite (arc, sizeof(struct arcInfo), *lineNum - 2, file);
+	fwrite (line, sizeof(struct lineInfo), *lineNum - 1, file);
 
 	fclose (file);
 }
@@ -333,9 +333,11 @@ int main (int argc, char **argv)
         //finding the time spent traveling on each line, and a unit vector pointing the direction of travel
         //Make more efficient
         for (i = 0; i < lineNum - 1; i++) {
-                line[i].dir = subVec (&line[i].end, &line[i].start);
-                line[i].time = magnitude (&line[i].dir) / gCode[i + 1].f;
-		normalize (&line[i].dir);
+                line[i].velocity = subVec (&line[i].end, &line[i].start);
+                line[i].time = magnitude (&line[i].velocity) / gCode[i + 1].f;
+		//printf ("%lf\n", line[i].time);
+		normalize (&line[i].velocity);
+		line[i].velocity = multVec (&line[i].velocity, gCode[i + 1].f);
         }
 
 	writeFile (ramp, arc, line, &lineNum, argv[1]);
