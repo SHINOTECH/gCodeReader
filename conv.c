@@ -76,6 +76,7 @@ int normalize (struct vector *input)
         double mag;
 
         mag = magnitude (input);
+
         input->x /= mag;
         input->y /= mag;
         input->z /= mag;
@@ -92,23 +93,23 @@ struct vector crossProduct (struct vector *in1, struct vector *in2)
         };
 }
 
-//Use dot product instead
-double angleProduct (struct vector *in1, struct vector *in2)
+double vectorAngle (struct vector *in1, struct vector *in2)
 {
-        struct vector cross;
-
-        cross = crossProduct (&*in1, &*in2);
-
-        return asin (magnitude (&cross) / (magnitude (&*in1) * magnitude (&*in2)));
+	return acos (((in1->x * in2->x) + (in1->y * in2->y) + (in1->z * in2->z)) / (magnitude (&*in1) * magnitude (&*in2)));
 }
 
-//Make more efficient
 struct vector getArcPos (struct arcInfo *arc, double angle)
 {
+	double	cosAngle,
+		sinAngle;
+
+	cosAngle = cos (angle);
+	sinAngle = sin (angle);
+
         return (struct vector){
-                (cos (angle) * arc->toSurf.x) + (sin (angle) * arc->cross.x) + arc->center.x,
-                (cos (angle) * arc->toSurf.y) + (sin (angle) * arc->cross.y) + arc->center.y,
-                (cos (angle) * arc->toSurf.z) + (sin (angle) * arc->cross.z) + arc->center.z
+                (cosAngle * arc->toSurf.x) + (sinAngle * arc->cross.x) + arc->center.x,
+                (cosAngle * arc->toSurf.y) + (sinAngle * arc->cross.y) + arc->center.y,
+                (cosAngle * arc->toSurf.z) + (sinAngle * arc->cross.z) + arc->center.z
         };
 }
 
@@ -173,7 +174,7 @@ void calcArcInfo (struct gCodeInfo *gCode, struct arcInfo *arc, struct lineInfo 
 
 		//theta is half the angle between start and end
 		//angle is the angle that the arc will travel
-		theta = angleProduct (&start, &toCenter);
+		theta = vectorAngle (&start, &toCenter);
 		arc[i].angle = 2.0 * ((M_PI / 2.0) - theta);
 
 		//Getting the minimum allowed acceleration of the axies in motion
@@ -305,6 +306,7 @@ void readFile (char *fileName, struct gCodeInfo **gCode, int *lineNum)
         fclose (file);
 }
 
+//Add error checking
 void writeFile (struct rampInfo *ramp, struct arcInfo *arc, struct lineInfo *line, int lineNum, char *fileName)
 {
 	FILE *file;
