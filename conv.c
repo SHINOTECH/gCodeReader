@@ -53,31 +53,31 @@ const struct vector maxAccel = {
         200.0
 };
 
-struct vector addVec (struct vector *in1, struct vector *in2)
+struct vector addVec (struct vector in1, struct vector in2)
 {
-        return (struct vector){in1->x + in2->x, in1->y + in2->y, in1->z + in2->z};
+        return (struct vector){in1.x + in2.x, in1.y + in2.y, in1.z + in2.z};
 }
 
-struct vector subVec (struct vector *in1, struct vector *in2)
+struct vector subVec (struct vector in1, struct vector in2)
 {
-        return (struct vector){in1->x - in2->x, in1->y - in2->y, in1->z - in2->z};
+        return (struct vector){in1.x - in2.x, in1.y - in2.y, in1.z - in2.z};
 }
 
-struct vector multVec (struct vector *vec, double scaler)
+struct vector multVec (struct vector vec, double scaler)
 {
-        return (struct vector){vec->x * scaler, vec->y * scaler, vec->z * scaler};
+        return (struct vector){vec.x * scaler, vec.y * scaler, vec.z * scaler};
 }
 
-double magnitude (struct vector *input)
+double magnitude (struct vector input)
 {
-        return fabs (sqrt (pow (input->x, 2) + pow (input->y, 2) + pow (input->z, 2)));
+        return fabs (sqrt (pow (input.x, 2) + pow (input.y, 2) + pow (input.z, 2)));
 }
 
 int normalize (struct vector *input)
 {
         double mag;
 
-        mag = magnitude (input);
+        mag = magnitude (*input);
 
         input->x /= mag;
         input->y /= mag;
@@ -86,21 +86,21 @@ int normalize (struct vector *input)
         return 0;
 }
 
-struct vector crossProduct (struct vector *in1, struct vector *in2)
+struct vector crossProduct (struct vector in1, struct vector in2)
 {
         return (struct vector){
-                (in1->y * in2->z) - (in1->z * in2->y),
-                (in1->z * in2->x) - (in1->x * in2->z),
-                (in1->x * in2->y) - (in1->y * in2->x)
+                (in1.y * in2.z) - (in1.z * in2.y),
+                (in1.z * in2.x) - (in1.x * in2.z),
+                (in1.x * in2.y) - (in1.y * in2.x)
         };
 }
 
-double vectorAngle (struct vector *in1, struct vector *in2)
+double vectorAngle (struct vector in1, struct vector in2)
 {
-	return acos (((in1->x * in2->x) + (in1->y * in2->y) + (in1->z * in2->z)) / (magnitude (&*in1) * magnitude (&*in2)));
+	return acos (((in1.x * in2.x) + (in1.y * in2.y) + (in1.z * in2.z)) / (magnitude (in1) * magnitude (in2)));
 }
 
-struct vector getArcPos (struct arcInfo *arc, double angle)
+struct vector getArcPos (struct arcInfo arc, double angle)
 {
 	double	cosAngle,
 		sinAngle;
@@ -109,9 +109,9 @@ struct vector getArcPos (struct arcInfo *arc, double angle)
 	sinAngle = sin (angle);
 
         return (struct vector){
-                (cosAngle * arc->toSurf.x) + (sinAngle * arc->cross.x) + arc->center.x,
-                (cosAngle * arc->toSurf.y) + (sinAngle * arc->cross.y) + arc->center.y,
-                (cosAngle * arc->toSurf.z) + (sinAngle * arc->cross.z) + arc->center.z
+                (cosAngle * arc.toSurf.x) + (sinAngle * arc.cross.x) + arc.center.x,
+                (cosAngle * arc.toSurf.y) + (sinAngle * arc.cross.y) + arc.center.y,
+                (cosAngle * arc.toSurf.z) + (sinAngle * arc.cross.z) + arc.center.z
         };
 }
 
@@ -123,7 +123,7 @@ int calcRampInfo (struct rampInfo *ramp, struct vector *start, struct vector *en
 
         ramp->accel = (struct vector){DBL_MAX, DBL_MAX, DBL_MAX};
 
-        dir = subVec (&*end, &*start);
+        dir = subVec (*end, *start);
         normalize (&dir);
 
 	//Getting the minimum allowed acceleration of the axies in motion
@@ -134,7 +134,7 @@ int calcRampInfo (struct rampInfo *ramp, struct vector *start, struct vector *en
         if (start->z != end->z && fabs (ramp->accel.z) > maxAccel.z)
 		accel = maxAccel.z / dir.z;
 
-	ramp->accel = multVec (&dir, accel);
+	ramp->accel = multVec (dir, accel);
         ramp->time = fabs (endVel - startVel) / accel;
 
         //Make shorter
@@ -167,18 +167,18 @@ void calcArcInfo (struct gCodeInfo *gCode, struct arcInfo *arc, struct lineInfo 
 		double accel = DBL_MAX;
 
 		//start and end are unit vectors pointing to the last and next G-code points from the current one
-		start = subVec (&gCode[i].p, &gCode[i + 1].p);
+		start = subVec (gCode[i].p, gCode[i + 1].p);
 		normalize (&start);
-		end = subVec (&gCode[i + 2].p, &gCode[i + 1].p);
+		end = subVec (gCode[i + 2].p, gCode[i + 1].p);
 		normalize (&end);
 
 		//toCenter is a unit vector pointing to where the center of the arc will be from the current G-code position
-		toCenter = addVec (&start, &end);
+		toCenter = addVec (start, end);
 		normalize (&toCenter);
 
 		//theta is half the angle between start and end
 		//angle is the angle that the arc will travel
-		theta = vectorAngle (&start, &toCenter);
+		theta = vectorAngle (start, toCenter);
 		arc[i].angle = 2.0 * ((M_PI / 2.0) - theta);
 
 		//Getting the minimum allowed acceleration of the axies in motion
@@ -201,30 +201,30 @@ void calcArcInfo (struct gCodeInfo *gCode, struct arcInfo *arc, struct lineInfo 
 
 		//Converting the unit vector to the center to a vector at the center
 		centerMag = arc[i].radius / sin (theta);
-		arc[i].center = multVec (&toCenter, centerMag);
+		arc[i].center = multVec (toCenter, centerMag);
 
 		//Calculating the arc's start and end points
 		length = arc[i].radius / tan (theta);
-		line[i + 1].start = multVec (&end, length);
-		line[i].end = multVec (&start, length);
+		line[i + 1].start = multVec (end, length);
+		line[i].end = multVec (start, length);
 
 		//Calculating a vector from the center to the start point
-		arc[i].toSurf = subVec (&line[i].end, &arc[i].center);
+		arc[i].toSurf = subVec (line[i].end, arc[i].center);
 		normalize (&arc[i].toSurf);
 
 		//Moving the vectors from 000 to the current G-code position
-		arc[i].center = addVec (&arc[i].center, &gCode[i + 1].p);
-		line[i + 1].start = addVec (&line[i + 1].start, &gCode[i + 1].p);
-		line[i].end = addVec (&line[i].end, &gCode[i + 1].p);
+		arc[i].center = addVec (arc[i].center, gCode[i + 1].p);
+		line[i + 1].start = addVec (line[i + 1].start, gCode[i + 1].p);
+		line[i].end = addVec (line[i].end, gCode[i + 1].p);
 
 		//Calculating the cross unit vector, needed for the 3D equation of a circle
-		normal = crossProduct (&end, &start);
-		arc[i].cross = crossProduct (&normal, &arc[i].toSurf);
+		normal = crossProduct (end, start);
+		arc[i].cross = crossProduct (normal, arc[i].toSurf);
 		normalize (&arc[i].cross);
 
 		//Multiplying the circle equation unit vectors by the radius, needed for the 3D equation of a circle
-		arc[i].toSurf = multVec (&arc[i].toSurf, arc[i].radius);
-		arc[i].cross = multVec (&arc[i].cross, arc[i].radius);
+		arc[i].toSurf = multVec (arc[i].toSurf, arc[i].radius);
+		arc[i].cross = multVec (arc[i].cross, arc[i].radius);
 	}
 }
 
@@ -233,10 +233,10 @@ void calcLineInfo (struct gCodeInfo *gCode, struct lineInfo *line, int lineNum)
 	unsigned int i;
 
         for (i = 0; i < lineNum - 1; i++) {
-                line[i].velocity = subVec (&line[i].end, &line[i].start);
-                line[i].time = magnitude (&line[i].velocity) / gCode[i + 1].f;
+                line[i].velocity = subVec (line[i].end, line[i].start);
+                line[i].time = magnitude (line[i].velocity) / gCode[i + 1].f;
 		normalize (&line[i].velocity);
-		line[i].velocity = multVec (&line[i].velocity, gCode[i + 1].f);
+		line[i].velocity = multVec (line[i].velocity, gCode[i + 1].f);
         }
 }
 
