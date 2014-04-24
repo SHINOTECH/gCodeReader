@@ -21,6 +21,7 @@ struct gCodeInfo {
         double f;
 };
 
+//Drop angle
 struct arcInfo {
         struct vector	toSurf,
         		center,
@@ -31,6 +32,7 @@ struct arcInfo {
         	time;
 };
 
+//Drop end
 struct lineInfo {
         struct vector	velocity,
 			start,
@@ -38,9 +40,9 @@ struct lineInfo {
         double time;
 };
 
+//Drop dir
 struct rampInfo {
-        struct vector   accel,
-                        dir;
+        struct vector accel;
         double time;
 };
 
@@ -115,38 +117,40 @@ struct vector getArcPos (struct arcInfo *arc, double angle)
 
 int calcRampInfo (struct rampInfo *ramp, struct vector *start, struct vector *end, double startVel, double endVel, struct vector *line)
 {
+	struct vector dir;
+	struct vector distance;
+	double accel;
+
         ramp->accel = (struct vector){DBL_MAX, DBL_MAX, DBL_MAX};
 
-        ramp->dir = subVec (&*end, &*start);
-        normalize (&ramp->dir);
+        dir = subVec (&*end, &*start);
+        normalize (&dir);
 
+	//Getting the minimum allowed acceleration of the axies in motion
         if (start->x != end->x && fabs (ramp->accel.x) > maxAccel.x)
-                ramp->accel = multVec (&ramp->dir, maxAccel.x / ramp->dir.x);
+		accel = maxAccel.x / dir.x;
         if (start->y != end->y && fabs (ramp->accel.y) > maxAccel.y)
-                ramp->accel = multVec (&ramp->dir, maxAccel.y / ramp->dir.y);
+		accel = maxAccel.y / dir.y;
         if (start->z != end->z && fabs (ramp->accel.z) > maxAccel.z)
-                ramp->accel = multVec (&ramp->dir, maxAccel.z / ramp->dir.z);
+		accel = maxAccel.z / dir.z;
 
-        ramp->time = fabs (endVel - startVel) / magnitude (&ramp->accel);
+	ramp->accel = multVec (&dir, accel);
+        ramp->time = fabs (endVel - startVel) / accel;
 
         //Make shorter
         if (endVel > startVel) {
-                line->x = ((ramp->accel.x / 2.0) * pow (ramp->time, 2.0)) + (startVel * ramp->time) + start->x;
-                line->y = ((ramp->accel.y / 2.0) * pow (ramp->time, 2.0)) + (startVel * ramp->time) + start->y;
-                line->z = ((ramp->accel.z / 2.0) * pow (ramp->time, 2.0)) + (startVel * ramp->time) + start->z;
+                line->x = ((ramp->accel.x / 2.0) * pow (ramp->time, 2.0)) + start->x;
+                line->y = ((ramp->accel.y / 2.0) * pow (ramp->time, 2.0)) + start->y;
+                line->z = ((ramp->accel.z / 2.0) * pow (ramp->time, 2.0)) + start->z;
         } else {
-                line->x = end->x - (((ramp->accel.x / 2.0) * pow (ramp->time, 2.0)) + (ramp->dir.x * startVel * ramp->time));
-                line->y = end->y - (((ramp->accel.y / 2.0) * pow (ramp->time, 2.0)) + (ramp->dir.y * startVel * ramp->time));
-                line->z = end->z - (((ramp->accel.z / 2.0) * pow (ramp->time, 2.0)) + (ramp->dir.z * startVel * ramp->time));
+                line->x = end->x - ((ramp->accel.x / 2.0) * pow (ramp->time, 2.0));
+                line->y = end->y - ((ramp->accel.y / 2.0) * pow (ramp->time, 2.0));
+                line->z = end->z - ((ramp->accel.z / 2.0) * pow (ramp->time, 2.0));
         }
 
         return 0;
 }
 
-/*
- * This subroutine calculates a travelable path based on the given G-code commands.
- * The path's corners are rounded based on the mills maximum accelerations.
- */
 void calcArcInfo (struct gCodeInfo *gCode, struct arcInfo *arc, struct lineInfo *line, int lineNum)
 {
 	unsigned int i;
