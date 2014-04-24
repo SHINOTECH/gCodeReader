@@ -211,6 +211,23 @@ void readFile (char *fileName, struct gCodeInfo **gCode, int *lineNum)
         fclose (file);
 }
 
+void writeFile (struct rampInfo *ramp, struct arcInfo *arc, struct lineInfo *line, int *lineNum, char *fileName)
+{
+	FILE *file;
+	char *name;
+
+	name = strtok (fileName, ".");
+
+	file = fopen (strcat (name, ".bin"), "w");
+
+	fwrite (lineNum, sizeof(int), 1, file);
+	fwrite (&ramp, sizeof(struct rampInfo), 2, file);
+	fwrite (&arc, sizeof(struct arcInfo), *lineNum - 2, file);
+	fwrite (&line, sizeof(struct lineInfo), *lineNum - 1, file);
+
+	fclose (file);
+}
+
 //Put each component into a subroutine
 int main (int argc, char **argv)
 {
@@ -223,8 +240,6 @@ int main (int argc, char **argv)
         struct lineInfo *line;
 
         struct rampInfo ramp[2];
-
-	FILE *file;
 
 	if (argc < 2) {
 		fprintf (stderr, "You need to pass in a G-code file\n");
@@ -323,13 +338,7 @@ int main (int argc, char **argv)
 		normalize (&line[i].dir);
         }
 
-	//Writing to file
-	file = fopen ("out.bin", "w");
-	fwrite (&lineNum, sizeof(int), 1, file);
-	fwrite (ramp, sizeof(struct rampInfo), 2, file);
-	fwrite (arc, sizeof(struct arcInfo), lineNum - 2, file);
-	fwrite (line, sizeof(struct lineInfo), lineNum - 1, file);
-	fclose (file);
+	writeFile (ramp, arc, line, &lineNum, argv[1]);
 
         //Free as soon a possible
         free (gCode);
