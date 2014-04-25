@@ -4,12 +4,6 @@
 #include <math.h>
 #include <float.h>
 
-//Check for bad gCode files!
-//Function error checking
-//Allow G02 and other commands
-//Imposible path checking
-//Make sure all varaible types are best for the situation
-
 struct vector {
         double  x,
                 y,
@@ -302,7 +296,6 @@ void readFile (char *fileName, struct gCodeInfo **gCode, int *lineNum)
         fclose (file);
 }
 
-//Add error checking
 void writeFile (struct rampInfo *ramp, struct arcInfo *arc, struct lineInfo *line, int lineNum, char *fileName)
 {
 	FILE *file;
@@ -338,8 +331,14 @@ int main (int argc, char **argv)
 
 	readFile (argv[1], &gCode, &lineNum);
 
-        arc = malloc ((lineNum - 2) * sizeof(*arc));
-        line = malloc ((lineNum - 1) * sizeof(*line));
+        if (!(arc = malloc ((lineNum - 2) * sizeof(struct arcInfo)))) {
+		fprintf (stderr, "Failed to allocate memory\n");
+		exit (1);
+	}
+        if (!(line = malloc ((lineNum - 1) * sizeof(struct lineInfo)))) {
+		fprintf (stderr, "Failed to allocate memory\n");
+		exit (1);
+	}
 
         calcRampInfo (&ramp[0], gCode[0].p, gCode[1].p, gCode[0].f, gCode[1].f, &line[0].start);
         calcRampInfo (&ramp[1], gCode[lineNum - 2].p, gCode[lineNum - 1].p, gCode[lineNum - 1].f, 0.0, &line[lineNum - 2].end);

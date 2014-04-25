@@ -2,8 +2,6 @@
 #include <stdlib.h>
 #include <math.h>
 
-//Error checking
-
 struct vector {
         double  x,
                 y,
@@ -64,15 +62,17 @@ struct vector getArcPos (struct arcInfo arc, double angle)
 
 int main (int argc, char **argv)
 {
-	FILE *file;
-	int lineNum;
-	struct arcInfo *arc;
-	struct lineInfo *line;
 	struct rampInfo ramp[2];
+	struct lineInfo *line;
+	struct arcInfo *arc;
+	int lineNum;
+
+	FILE *file;
 
 	double time = 0;
         double totalTime = 0;
 	double timeStep = 0.001;
+
         struct vector point;
 
 	unsigned int i;
@@ -85,14 +85,23 @@ int main (int argc, char **argv)
 		return 1;
 	}
 
-	file = fopen (argv[1], "r");
+	if (!(file = fopen (argv[1], "r"))) {
+		perror ("Failed to open file");
+		exit (1);
+	}
 
 	fread (&lineNum, sizeof(int), 1, file);
 
 	fread (ramp, sizeof(struct rampInfo), 2, file);
 
-	arc = malloc ((lineNum - 2) * sizeof(struct arcInfo));
-	line = malloc ((lineNum - 1) * sizeof(struct lineInfo));
+	if (!(arc = malloc ((lineNum - 2) * sizeof(struct arcInfo)))) {
+		fprintf (stderr, "Failed to allocate memory\n");
+		exit (1);
+	}
+	if (!(line = malloc ((lineNum - 1) * sizeof(struct lineInfo)))) {
+		fprintf (stderr, "Failed to allocate memory\n");
+		exit (1);
+	}
 
 	fread (arc, sizeof(struct arcInfo), lineNum - 2, file);
 	fread (line, sizeof(struct lineInfo), lineNum - 1, file);
@@ -109,6 +118,7 @@ int main (int argc, char **argv)
         totalTime += ramp[0].time;
 
         for (i = 0; ; i++) {
+		//Line
 		for (time = 0.0; time < line[i].time; time += timeStep) {
 			point = addVec (line[i].start, multVec (line[i].velocity, time));
 			fprintf (file, "%f, %f, %f\n", point.x, point.y, point.z);
@@ -118,6 +128,7 @@ int main (int argc, char **argv)
                 if (i == lineNum - 2)
                         break;
 
+		//Arc
                 for (time = 0.0; time < arc[i].time; time += timeStep) {
                         point = getArcPos (arc[i], ((0.5 * arc[i].accel * pow (time, 2.0)) + (magnitude (line[i].velocity) * time)) / arc[i].radius);
                         fprintf (file, "%f, %f, %f\n", point.x, point.y, point.z);
