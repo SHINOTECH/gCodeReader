@@ -69,11 +69,15 @@ int main (int argc, char **argv)
 
 	FILE *file;
 
-	double time = 0;
-        double totalTime = 0;
+	double time = 0.0;
+        double totalTime = 0.0;
 	double timeStep = 0.001;
 
-        struct vector point;
+        struct vector point = {0.0, 0.0, 0.0};
+        struct vector lastPoint;
+
+	FILE *posFile;
+	FILE *timeFile;
 
 	unsigned int i;
 
@@ -108,20 +112,25 @@ int main (int argc, char **argv)
 
 	fclose (file);
 
-	file = fopen ("plot.csv", "w");
+	posFile = fopen ("pos.csv", "w");
+	timeFile = fopen ("time.csv", "w");
 
 	//Ramp up
-        for (time = 0; time < ramp[0].time; time += timeStep) {
+        for (time = 0.0; time < ramp[0].time; time += timeStep) {
+		lastPoint = point;
 		point = multVec (ramp[0].accel, 0.5 * pow (time, 2.0));
-                fprintf (file, "%f, %f, %f\n", point.x, point.y, point.z);
+                fprintf (posFile, "%f, %f, %f\n", point.x, point.y, point.z);
+                fprintf (timeFile, "%f, %f\n", totalTime + time, (point.x - lastPoint.x) / timeStep);
         }
         totalTime += ramp[0].time;
 
         for (i = 0; ; i++) {
 		//Line
 		for (time = 0.0; time < line[i].time; time += timeStep) {
+			lastPoint = point;
 			point = addVec (line[i].start, multVec (line[i].velocity, time));
-			fprintf (file, "%f, %f, %f\n", point.x, point.y, point.z);
+			fprintf (posFile, "%f, %f, %f\n", point.x, point.y, point.z);
+			fprintf (timeFile, "%f, %f\n", totalTime + time, (point.x - lastPoint.x) / timeStep);
 		}
                 totalTime += line[i].time;
 
@@ -130,20 +139,25 @@ int main (int argc, char **argv)
 
 		//Arc
                 for (time = 0.0; time < arc[i].time; time += timeStep) {
+			lastPoint = point;
                         point = getArcPos (arc[i], ((0.5 * arc[i].accel * pow (time, 2.0)) + (magnitude (line[i].velocity) * time)) / arc[i].radius);
-                        fprintf (file, "%f, %f, %f\n", point.x, point.y, point.z);
+                        fprintf (posFile, "%f, %f, %f\n", point.x, point.y, point.z);
+			fprintf (timeFile, "%f, %f\n", totalTime + time, (point.x - lastPoint.x) / timeStep);
                 }
                 totalTime += arc[i].time;
         }
 
 	//Ramp down
-        for (time = 0; time < ramp[1].time; time += timeStep) {
+        for (time = 0.0; time < ramp[1].time; time += timeStep) {
+		lastPoint = point;
 		point = addVec (line[lineNum - 2].end, addVec (multVec (ramp[1].accel, -0.5 * pow (time, 2.0)), multVec (line[lineNum - 2].velocity, time)));
-                fprintf (file, "%f, %f, %f\n", point.x, point.y, point.z);
+                fprintf (posFile, "%f, %f, %f\n", point.x, point.y, point.z);
+		fprintf (timeFile, "%f, %f\n", totalTime + time, (point.x - lastPoint.x) / timeStep);
         }
         totalTime += ramp[1].time;
 
-	fclose (file);
+	fclose (posFile);
+	fclose (timeFile);
 
 	free (arc);
 	free (line);
